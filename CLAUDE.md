@@ -592,6 +592,7 @@ pytest tests/ -v
 
 For detailed specifications, see:
 
+- `PROGRESS.md` — Session logs tracking progress and current status
 - `docs/PROJECT_BRIEF.md` — High-level context, hackathon details
 - `docs/TECHNICAL_SPECIFICATION.md` — Detailed architecture, component specs
 - `docs/IMPLEMENTATION_PLAN.md` — Phased timeline, tasks, milestones

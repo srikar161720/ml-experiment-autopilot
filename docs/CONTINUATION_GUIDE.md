@@ -40,11 +40,12 @@ This document helps quickly understand context and continue development of the M
 | Document | Purpose | When to Reference |
 |----------|---------|-------------------|
 | `CLAUDE.md` | Claude Code context, patterns, quick reference | **Primary reference during coding** |
+| `PROGRESS.md` | Session logs tracking progress (gitignored) | Start of every new session to understand progress and current status |
 | `PROJECT_BRIEF.md` | High-level context, hackathon details | Understanding "why" and constraints |
 | `TECHNICAL_SPECIFICATION.md` | Detailed architecture, component specs | Designing/implementing components |
 | `IMPLEMENTATION_PLAN.md` | Phased timeline, tasks, milestones | Planning work, tracking progress |
 | `TECHNICAL_REFERENCE.md` | Code snippets, dependencies, templates | Actually writing code |
-| `CONTINUATION_GUIDE.md` (this file) | Quick orientation | Starting a new session |
+| `CONTINUATION_GUIDE.md` (this file) | Quick orientation | Starting the very first session |
 
 ---
 

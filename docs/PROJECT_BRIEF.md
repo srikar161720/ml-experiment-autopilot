@@ -169,6 +169,7 @@ Unlike AutoML tools (H2O, AutoGluon) that operate as black boxes, this agent:
 | Document | Purpose |
 |----------|---------|
 | `CLAUDE.md` | Claude Code context (primary reference during coding) |
+| `PROGRESS.md` | Session logs tracking progress and current status |
 | `TECHNICAL_SPECIFICATION.md` | Detailed architecture, component specs |
 | `IMPLEMENTATION_PLAN.md` | Phased timeline, tasks, milestones |
 | `TECHNICAL_REFERENCE.md` | Code snippets, dependencies, templates |
