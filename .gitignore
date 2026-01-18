@@ -1,1 +1,39 @@
+# OS
 .DS_Store
+
+# Environment
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Project outputs (keep .gitkeep files)
+outputs/experiments/*
+!outputs/experiments/.gitkeep
+outputs/reports/*
+!outputs/reports/.gitkeep
+outputs/models/*
+!outputs/models/.gitkeep
+outputs/mlruns/*
+!outputs/mlruns/.gitkeep
+
+# State files
+state_*.json

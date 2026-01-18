@@ -1,0 +1,33 @@
+{% extends "base_experiment.py.jinja" %}
+
+{% block imports %}
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, AdaBoostClassifier
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.naive_bayes import GaussianNB
+{% endblock %}
+
+{% block model %}
+    {% if model_type == 'LogisticRegression' %}
+    return LogisticRegression({{ model_params_str }}random_state=RANDOM_STATE, max_iter=1000, n_jobs=-1)
+    {% elif model_type == 'DecisionTreeClassifier' %}
+    return DecisionTreeClassifier({{ model_params_str }}random_state=RANDOM_STATE)
+    {% elif model_type == 'RandomForestClassifier' %}
+    return RandomForestClassifier({{ model_params_str }}random_state=RANDOM_STATE, n_jobs=-1)
+    {% elif model_type == 'GradientBoostingClassifier' %}
+    return GradientBoostingClassifier({{ model_params_str }}random_state=RANDOM_STATE)
+    {% elif model_type == 'AdaBoostClassifier' %}
+    return AdaBoostClassifier({{ model_params_str }}random_state=RANDOM_STATE)
+    {% elif model_type == 'SVC' %}
+    return SVC({{ model_params_str }}random_state=RANDOM_STATE, probability=True)
+    {% elif model_type == 'KNeighborsClassifier' %}
+    return KNeighborsClassifier({{ model_params_str }}n_jobs=-1)
+    {% elif model_type == 'GaussianNB' %}
+    return GaussianNB({{ model_params_str }})
+    {% else %}
+    # Default to RandomForest
+    return RandomForestClassifier(n_estimators=100, random_state=RANDOM_STATE, n_jobs=-1)
+    {% endif %}
+{% endblock %}
