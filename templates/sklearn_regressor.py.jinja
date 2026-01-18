@@ -1,0 +1,36 @@
+{% extends "base_experiment.py.jinja" %}
+
+{% block imports %}
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, AdaBoostRegressor
+from sklearn.svm import SVR
+from sklearn.neighbors import KNeighborsRegressor
+{% endblock %}
+
+{% block model %}
+    {% if model_type == 'LinearRegression' %}
+    return LinearRegression({{ model_params_str }})
+    {% elif model_type == 'Ridge' %}
+    return Ridge({{ model_params_str }}random_state=RANDOM_STATE)
+    {% elif model_type == 'Lasso' %}
+    return Lasso({{ model_params_str }}random_state=RANDOM_STATE)
+    {% elif model_type == 'ElasticNet' %}
+    return ElasticNet({{ model_params_str }}random_state=RANDOM_STATE)
+    {% elif model_type == 'DecisionTreeRegressor' %}
+    return DecisionTreeRegressor({{ model_params_str }}random_state=RANDOM_STATE)
+    {% elif model_type == 'RandomForestRegressor' %}
+    return RandomForestRegressor({{ model_params_str }}random_state=RANDOM_STATE, n_jobs=-1)
+    {% elif model_type == 'GradientBoostingRegressor' %}
+    return GradientBoostingRegressor({{ model_params_str }}random_state=RANDOM_STATE)
+    {% elif model_type == 'AdaBoostRegressor' %}
+    return AdaBoostRegressor({{ model_params_str }}random_state=RANDOM_STATE)
+    {% elif model_type == 'SVR' %}
+    return SVR({{ model_params_str }})
+    {% elif model_type == 'KNeighborsRegressor' %}
+    return KNeighborsRegressor({{ model_params_str }}n_jobs=-1)
+    {% else %}
+    # Default to RandomForest
+    return RandomForestRegressor(n_estimators=100, random_state=RANDOM_STATE, n_jobs=-1)
+    {% endif %}
+{% endblock %}
