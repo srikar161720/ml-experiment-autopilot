@@ -305,7 +305,7 @@ Optional Markdown file for user preferences:
 ```python
 # ALWAYS use these settings
 GEMINI_CONFIG = {
-    "model": "gemini-3-pro-preview",  # Update with actual model string
+    "model": "gemini-3-pro-preview",  # Gemini 3 Pro Preview (free tier)
     "temperature": 1.0,  # REQUIRED - lower values degrade reasoning
     "thinking_level": "high",  # For complex tasks
 }

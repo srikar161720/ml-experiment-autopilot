@@ -206,7 +206,7 @@ def should_terminate(state: ExperimentState) -> tuple[bool, str]:
 
 ```python
 GEMINI_CONFIG = {
-    "model": "gemini-3-pro-preview",  # Update with actual model string
+    "model": "gemini-3-pro-preview",  # Gemini 3 Pro Preview (free tier)
     "temperature": 1.0,  # REQUIRED - do not lower
     "default_thinking_level": "high",
 }
