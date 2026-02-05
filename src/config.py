@@ -28,7 +28,7 @@ class GeminiConfig:
     """Configuration for Gemini API."""
 
     api_key: str = field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
-    model: str = "gemini-3-pro-preview"  # Gemini 3 Pro Preview model
+    model: str = "gemini-3-flash-preview"  # Gemini 3 Flash Preview model (Tier 1)
     temperature: float = 1.0  # REQUIRED - lower values degrade reasoning
     default_thinking_level: str = "high"
     max_retries: int = 3

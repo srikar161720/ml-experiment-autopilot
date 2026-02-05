@@ -13,13 +13,10 @@ from src.orchestration.state import (
     ExperimentSpec,
     create_initial_state,
 )
-from src.cognitive.gemini_client import (
-    GeminiClient,
-    create_experiment_designer_prompt,
-    GeminiError,
-)
+from src.cognitive.gemini_client import GeminiClient, GeminiError
+from src.cognitive.experiment_designer import ExperimentDesigner
 from src.execution.data_profiler import DataProfiler
-from src.execution.code_generator import CodeGenerator, create_experiment_from_gemini_response
+from src.execution.code_generator import CodeGenerator
 from src.execution.experiment_runner import ExperimentRunner
 from src.persistence.mlflow_tracker import create_tracker
 from src.utils.display import (
@@ -102,6 +99,7 @@ class ExperimentController:
         # Initialize components
         self.config = get_config(verbose=verbose)
         self.gemini = GeminiClient()
+        self.experiment_designer = ExperimentDesigner(self.gemini)
         self.profiler = DataProfiler(data_path, target_column, task_type)
         self.code_generator = CodeGenerator()
         self.runner = ExperimentRunner()
@@ -152,11 +150,15 @@ class ExperimentController:
             profile = self.profiler.profile()
             self.state.data_profile = profile
 
-            # Determine primary metric
-            if self.task_type == "regression":
-                self.state.config.primary_metric = "rmse"
+            # Parse constraints and determine primary metric using ExperimentDesigner
+            if self.constraints:
+                parsed_constraints = self.experiment_designer.parse_constraints(self.constraints)
             else:
-                self.state.config.primary_metric = "f1"
+                parsed_constraints = None
+
+            self.state.config.primary_metric = self.experiment_designer.select_primary_metric(
+                self.task_type, parsed_constraints
+            )
 
             # Print profile summary
             print_data_profile(profile.model_dump())
@@ -296,63 +298,25 @@ class ExperimentController:
         self.save_state()
 
     def _design_experiment(self) -> Optional[ExperimentSpec]:
-        """Use Gemini to design the next experiment."""
-        # Prepare previous results summary
-        previous_results = [
-            {
-                "name": exp.experiment_name,
-                "model": exp.model_type,
-                "metrics": exp.metrics,
-                "hypothesis": exp.hypothesis,
-                "success": exp.success,
-            }
-            for exp in self.state.experiments[-5:]  # Last 5 experiments
-        ]
-
-        # Create prompt
-        prompt = create_experiment_designer_prompt(
-            data_profile=self.state.data_profile.model_dump() if self.state.data_profile else {},
-            previous_results=previous_results,
-            constraints=self.constraints,
-            task_type=self.task_type,
-        )
+        """Use Gemini via ExperimentDesigner to design the next experiment."""
+        iteration = self.state.current_iteration + 1
 
         try:
-            response = self.gemini.generate_json(
-                prompt=prompt,
-                system_instruction="You are an expert ML engineer designing experiments. Always respond with valid JSON.",
-                thinking_level="high",
+            return self.experiment_designer.design_experiment(
+                data_profile=self.state.data_profile,
+                previous_results=self.state.experiments,
+                task_type=self.task_type,
+                constraints=self.constraints,
+                iteration=iteration,
             )
-
-            return create_experiment_from_gemini_response(response)
 
         except GeminiError as e:
             print_error("Gemini API error", str(e))
-            return self._get_fallback_experiment()
+            return None
 
-        except ValueError as e:
-            print_warning(f"Invalid Gemini response: {e}")
-            return self._get_fallback_experiment()
-
-    def _get_fallback_experiment(self) -> ExperimentSpec:
-        """Get a fallback experiment when Gemini fails."""
-        iteration = self.state.current_iteration + 1
-
-        if self.task_type == "regression":
-            models = ["RandomForestRegressor", "GradientBoostingRegressor", "Ridge"]
-        else:
-            models = ["RandomForestClassifier", "GradientBoostingClassifier", "LogisticRegression"]
-
-        model_idx = iteration % len(models)
-        model_type = models[model_idx]
-
-        return ExperimentSpec(
-            experiment_name=f"fallback_{model_type.lower()}_{iteration}",
-            hypothesis=f"Fallback experiment with {model_type}",
-            model_type=model_type,
-            model_params={"n_estimators": 100} if "Forest" in model_type or "Boosting" in model_type else {},
-            reasoning="Fallback experiment due to Gemini API issues",
-        )
+        except Exception as e:
+            print_warning(f"Error designing experiment: {e}")
+            return None
 
     def _finalize(self):
         """Finalize the experiment session."""
