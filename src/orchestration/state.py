@@ -35,6 +35,16 @@ class ExperimentPhase(str, Enum):
     FAILED = "failed"
 
 
+class TrendPattern(str, Enum):
+    """Detected performance trend patterns."""
+
+    IMPROVING = "improving"
+    DEGRADING = "degrading"
+    PLATEAU = "plateau"
+    FLUCTUATING = "fluctuating"
+    INITIAL = "initial"  # Not enough data to determine
+
+
 class PreprocessingConfig(BaseModel):
     """Configuration for data preprocessing."""
 
@@ -122,6 +132,63 @@ class ConversationEntry(BaseModel):
     role: str  # "user" or "model"
     content: str
     timestamp: datetime = Field(default_factory=datetime.now)
+
+
+class MetricComparison(BaseModel):
+    """Comparison of a metric against baseline and best values."""
+
+    metric_name: str
+    current_value: float
+    baseline_value: Optional[float] = None
+    best_value: Optional[float] = None
+    previous_value: Optional[float] = None
+    change_from_baseline_pct: Optional[float] = None
+    change_from_best_pct: Optional[float] = None
+    change_from_previous_pct: Optional[float] = None
+    is_improvement: bool = False
+    is_new_best: bool = False
+
+
+class AnalysisResult(BaseModel):
+    """Complete results analysis for a single experiment."""
+
+    experiment_name: str
+    iteration: int
+    success: bool
+    primary_metric: Optional[MetricComparison] = None
+    trend_pattern: TrendPattern = TrendPattern.INITIAL
+    key_observations: list[str] = Field(default_factory=list)
+    reasoning: str = ""
+    timestamp: datetime = Field(default_factory=datetime.now)
+
+
+class Hypothesis(BaseModel):
+    """A single testable hypothesis for the next iteration."""
+
+    hypothesis_id: str  # e.g., "h1", "h2"
+    statement: str  # Clear hypothesis statement
+    rationale: str  # Why this hypothesis is worth testing
+    suggested_model: Optional[str] = None
+    suggested_params: dict[str, Any] = Field(default_factory=dict)
+    confidence_score: float = Field(ge=0.0, le=1.0)  # 0-1 confidence
+    priority: int = Field(ge=1, le=3)  # 1=highest, 3=lowest
+
+
+class HypothesisSet(BaseModel):
+    """Set of hypotheses generated for the next iteration."""
+
+    iteration: int
+    analysis_summary: str  # Summary of what led to these hypotheses
+    hypotheses: list[Hypothesis] = Field(default_factory=list)
+    exploration_vs_exploitation: str = "balanced"  # "explore", "exploit", "balanced"
+    reasoning: str = ""
+    timestamp: datetime = Field(default_factory=datetime.now)
+
+    def get_top_hypothesis(self) -> Optional[Hypothesis]:
+        """Get the highest priority hypothesis."""
+        if not self.hypotheses:
+            return None
+        return min(self.hypotheses, key=lambda h: h.priority)
 
 
 class ExperimentState(BaseModel):
