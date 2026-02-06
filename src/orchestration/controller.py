@@ -11,10 +11,14 @@ from src.orchestration.state import (
     ExperimentPhase,
     ExperimentResult,
     ExperimentSpec,
+    AnalysisResult,
+    HypothesisSet,
     create_initial_state,
 )
 from src.cognitive.gemini_client import GeminiClient, GeminiError
 from src.cognitive.experiment_designer import ExperimentDesigner
+from src.cognitive.results_analyzer import ResultsAnalyzer
+from src.cognitive.hypothesis_generator import HypothesisGenerator
 from src.execution.data_profiler import DataProfiler
 from src.execution.code_generator import CodeGenerator
 from src.execution.experiment_runner import ExperimentRunner
@@ -32,6 +36,8 @@ from src.utils.display import (
     print_error,
     print_warning,
     print_success,
+    print_analysis,
+    print_hypotheses,
 )
 
 
@@ -100,12 +106,18 @@ class ExperimentController:
         self.config = get_config(verbose=verbose)
         self.gemini = GeminiClient()
         self.experiment_designer = ExperimentDesigner(self.gemini)
+        self.results_analyzer = ResultsAnalyzer(self.gemini)
+        self.hypothesis_generator = HypothesisGenerator(self.gemini)
         self.profiler = DataProfiler(data_path, target_column, task_type)
         self.code_generator = CodeGenerator()
         self.runner = ExperimentRunner()
 
         # MLflow tracker (initialized after profiling)
         self.tracker = None
+
+        # Track latest analysis and hypotheses for cross-iteration context
+        self._latest_analysis: Optional[AnalysisResult] = None
+        self._latest_hypotheses: Optional[HypothesisSet] = None
 
         # Experiment output directory
         self.experiments_dir = EXPERIMENTS_DIR / self.state.session_id
@@ -294,6 +306,20 @@ class ExperimentController:
                 self.state.best_metric or 0,
             )
 
+        # Analyze results
+        self.state.phase = ExperimentPhase.RESULTS_ANALYSIS
+        self._latest_analysis = self._analyze_results(result)
+
+        if self._latest_analysis:
+            print_analysis(self._latest_analysis.model_dump(), verbose=self.verbose)
+
+        # Generate hypotheses for next iteration
+        self.state.phase = ExperimentPhase.HYPOTHESIS_GENERATION
+        self._latest_hypotheses = self._generate_hypotheses(self._latest_analysis)
+
+        if self._latest_hypotheses:
+            print_hypotheses(self._latest_hypotheses.model_dump(), verbose=self.verbose)
+
         self.state.phase = ExperimentPhase.EXPERIMENT_DESIGN
         self.save_state()
 
@@ -301,12 +327,29 @@ class ExperimentController:
         """Use Gemini via ExperimentDesigner to design the next experiment."""
         iteration = self.state.current_iteration + 1
 
+        # Build constraints with hypothesis context from previous iteration
+        constraints_with_hypotheses = self.constraints or ""
+        if self._latest_hypotheses:
+            top = self._latest_hypotheses.get_top_hypothesis()
+            if top:
+                hypothesis_context = (
+                    f"\n\n## Current Top Hypothesis\n"
+                    f"- Statement: {top.statement}\n"
+                    f"- Rationale: {top.rationale}\n"
+                    f"- Confidence: {top.confidence_score:.0%}\n"
+                )
+                if top.suggested_model:
+                    hypothesis_context += f"- Suggested model: {top.suggested_model}\n"
+                if top.suggested_params:
+                    hypothesis_context += f"- Suggested params: {top.suggested_params}\n"
+                constraints_with_hypotheses += hypothesis_context
+
         try:
             return self.experiment_designer.design_experiment(
                 data_profile=self.state.data_profile,
                 previous_results=self.state.experiments,
                 task_type=self.task_type,
-                constraints=self.constraints,
+                constraints=constraints_with_hypotheses if constraints_with_hypotheses else None,
                 iteration=iteration,
             )
 
@@ -316,6 +359,44 @@ class ExperimentController:
 
         except Exception as e:
             print_warning(f"Error designing experiment: {e}")
+            return None
+
+    def _analyze_results(self, result: ExperimentResult) -> Optional[AnalysisResult]:
+        """Use ResultsAnalyzer to analyze the experiment results.
+
+        Args:
+            result: The experiment result to analyze.
+
+        Returns:
+            AnalysisResult or None if analysis fails.
+        """
+        try:
+            return self.results_analyzer.analyze(
+                current_result=result,
+                state=self.state,
+            )
+        except Exception as e:
+            print_warning(f"Results analysis failed: {e}")
+            return None
+
+    def _generate_hypotheses(self, analysis: Optional[AnalysisResult]) -> Optional[HypothesisSet]:
+        """Use HypothesisGenerator to generate hypotheses for next iteration.
+
+        Args:
+            analysis: The analysis result to base hypotheses on.
+
+        Returns:
+            HypothesisSet or None if generation fails.
+        """
+        if analysis is None:
+            return None
+        try:
+            return self.hypothesis_generator.generate(
+                analysis=analysis,
+                state=self.state,
+            )
+        except Exception as e:
+            print_warning(f"Hypothesis generation failed: {e}")
             return None
 
     def _finalize(self):

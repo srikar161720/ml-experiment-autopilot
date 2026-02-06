@@ -218,6 +218,109 @@ def print_success(message: str):
     console.print(f"[green]Success:[/green] {message}")
 
 
+def print_analysis(analysis_data: dict, verbose: bool = False):
+    """Print experiment analysis results.
+
+    Args:
+        analysis_data: AnalysisResult as dict (from model_dump()).
+        verbose: Whether to show detailed reasoning.
+    """
+    content = []
+
+    # Trend pattern
+    trend = analysis_data.get("trend_pattern", "unknown")
+    trend_styles = {
+        "improving": "[green]improving[/green]",
+        "degrading": "[red]degrading[/red]",
+        "plateau": "[yellow]plateau[/yellow]",
+        "fluctuating": "[yellow]fluctuating[/yellow]",
+        "initial": "[dim]initial[/dim]",
+    }
+    content.append(f"[bold]Trend:[/bold] {trend_styles.get(trend, trend)}")
+
+    # Primary metric comparison
+    metric = analysis_data.get("primary_metric")
+    if metric:
+        metric_name = metric.get("metric_name", "metric")
+        current = metric.get("current_value", 0)
+        is_new_best = metric.get("is_new_best", False)
+
+        status = " [bold green]NEW BEST[/bold green]" if is_new_best else ""
+        content.append(f"[bold]{metric_name}:[/bold] {current:.6f}{status}")
+
+        change_baseline = metric.get("change_from_baseline_pct")
+        if change_baseline is not None:
+            direction = "better" if change_baseline > 0 else "worse"
+            style = "green" if change_baseline > 0 else "red"
+            content.append(
+                f"  [{style}]{abs(change_baseline):.1f}% {direction} than baseline[/{style}]"
+            )
+
+    # Key observations
+    observations = analysis_data.get("key_observations", [])
+    if observations:
+        content.append("\n[bold]Key Observations:[/bold]")
+        for obs in observations:
+            content.append(f"  - {obs}")
+
+    if verbose and analysis_data.get("reasoning"):
+        content.append(f"\n[dim]{analysis_data['reasoning']}[/dim]")
+
+    console.print(Panel(
+        "\n".join(content),
+        title="RESULTS ANALYSIS",
+        border_style="cyan",
+        padding=(0, 2),
+    ))
+
+
+def print_hypotheses(hypotheses_data: dict, verbose: bool = False):
+    """Print generated hypotheses for the next iteration.
+
+    Args:
+        hypotheses_data: HypothesisSet as dict (from model_dump()).
+        verbose: Whether to show detailed reasoning.
+    """
+    content = []
+
+    strategy = hypotheses_data.get("exploration_vs_exploitation", "balanced")
+    strategy_styles = {
+        "explore": "[magenta]explore[/magenta]",
+        "exploit": "[green]exploit[/green]",
+        "balanced": "[blue]balanced[/blue]",
+    }
+    content.append(f"[bold]Strategy:[/bold] {strategy_styles.get(strategy, strategy)}")
+
+    summary = hypotheses_data.get("analysis_summary", "")
+    if summary:
+        content.append(f"[dim]{summary}[/dim]\n")
+
+    hypotheses = hypotheses_data.get("hypotheses", [])
+    for h in hypotheses:
+        priority = h.get("priority", "?")
+        confidence = h.get("confidence_score", 0)
+        statement = h.get("statement", "")
+        model = h.get("suggested_model", "")
+
+        content.append(
+            f"[bold]#{priority}[/bold] (confidence: {confidence:.0%}) {statement}"
+        )
+        if model:
+            content.append(f"    Model: [cyan]{model}[/cyan]")
+        if verbose and h.get("rationale"):
+            content.append(f"    [dim]{h['rationale']}[/dim]")
+
+    if verbose and hypotheses_data.get("reasoning"):
+        content.append(f"\n[dim]{hypotheses_data['reasoning']}[/dim]")
+
+    console.print(Panel(
+        "\n".join(content),
+        title="HYPOTHESES FOR NEXT ITERATION",
+        border_style="yellow",
+        padding=(0, 2),
+    ))
+
+
 def create_progress() -> Progress:
     """Create a progress display for long-running operations."""
     return Progress(
