@@ -163,8 +163,15 @@ class CodeGenerator:
             "reasoning": spec.reasoning,
         }
 
+    # Parameters that the Jinja2 templates already handle directly.
+    # Excluded here as a defensive layer to prevent duplicate keyword arguments.
+    TEMPLATE_MANAGED_PARAMS = {"random_state", "n_jobs", "verbose", "max_iter", "probability"}
+
     def _format_model_params(self, params: dict) -> str:
         """Format model parameters as a string for template insertion.
+
+        Excludes parameters that the templates handle separately
+        (random_state, n_jobs, etc.) to prevent duplicate keyword arguments.
 
         Args:
             params: Dictionary of model parameters.
@@ -177,10 +184,15 @@ class CodeGenerator:
 
         parts = []
         for key, value in params.items():
+            if key in self.TEMPLATE_MANAGED_PARAMS:
+                continue
             if isinstance(value, str):
                 parts.append(f'{key}="{value}"')
             else:
                 parts.append(f"{key}={value}")
+
+        if not parts:
+            return ""
 
         return ", ".join(parts) + ", "
 

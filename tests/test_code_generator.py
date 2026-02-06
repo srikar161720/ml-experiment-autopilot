@@ -168,6 +168,63 @@ class TestCodeGenerator:
         assert "max_depth=3" in code
 
 
+    def test_format_model_params_excludes_template_managed(self):
+        """Test that _format_model_params strips random_state, n_jobs, etc."""
+        generator = CodeGenerator()
+
+        params = {
+            "n_estimators": 100,
+            "max_depth": 5,
+            "random_state": 42,
+            "n_jobs": -1,
+            "max_iter": 5000,
+            "probability": True,
+            "verbose": 1,
+        }
+
+        result = generator._format_model_params(params)
+
+        assert "n_estimators=100" in result
+        assert "max_depth=5" in result
+        assert "random_state" not in result
+        assert "n_jobs" not in result
+        assert "max_iter" not in result
+        assert "probability" not in result
+        assert "verbose" not in result
+
+    def test_generate_with_random_state_in_params_no_syntax_error(
+        self, temp_data_file, temp_output_dir
+    ):
+        """Test that random_state in model_params doesn't cause duplicate kwarg."""
+        generator = CodeGenerator()
+
+        spec = ExperimentSpec(
+            experiment_name="test_no_dup_random_state",
+            hypothesis="Test no duplicate random_state",
+            model_type="Ridge",
+            model_params={
+                "alpha": 1.0,
+                "random_state": 42,  # Should be filtered out
+            },
+            reasoning="Test",
+        )
+
+        script_path = generator.generate(
+            spec=spec,
+            data_path=temp_data_file,
+            target_column="target",
+            task_type="regression",
+            output_dir=temp_output_dir,
+        )
+
+        code = script_path.read_text()
+        # The Gemini-provided "random_state=42" should NOT appear as a model kwarg
+        # (the template uses RANDOM_STATE constant instead)
+        assert "random_state=42," not in code
+        # Should still be valid Python (no duplicate keyword argument)
+        ast.parse(code)
+
+
 class TestCreateExperimentFromResponse:
     """Test cases for parsing Gemini responses."""
 

@@ -7,6 +7,7 @@ from src.cognitive.experiment_designer import (
     ExperimentDesigner,
     ParsedConstraints,
     EXPERIMENT_DESIGNER_SYSTEM_PROMPT,
+    TEMPLATE_MANAGED_PARAMS,
 )
 from src.cognitive.gemini_client import (
     GeminiClient,
@@ -165,6 +166,45 @@ class TestExperimentDesigner:
         call_args = mock_gemini_client.model.generate_content.call_args
         prompt_text = str(call_args)
         assert "baseline" in prompt_text or "Previous" in prompt_text
+
+    def test_design_experiment_filters_template_managed_params(
+        self, mock_gemini_client, sample_data_profile, mock_genai
+    ):
+        """Test that template-managed params (random_state, n_jobs, etc.) are stripped."""
+        mock_response = Mock()
+        mock_response.text = '''{
+            "experiment_name": "ridge_test_1",
+            "hypothesis": "Test Ridge with regularization",
+            "model_type": "Ridge",
+            "model_params": {
+                "alpha": 1.0,
+                "random_state": 42,
+                "n_jobs": -1,
+                "max_iter": 5000
+            },
+            "preprocessing": {
+                "missing_values": "median",
+                "scaling": "standard",
+                "encoding": "onehot"
+            },
+            "reasoning": "Testing regularization"
+        }'''
+        mock_gemini_client.model.generate_content.return_value = mock_response
+
+        designer = ExperimentDesigner(mock_gemini_client)
+        spec = designer.design_experiment(
+            data_profile=sample_data_profile,
+            previous_results=[],
+            task_type="regression",
+            iteration=1,
+        )
+
+        # Template-managed params should be filtered out
+        assert "random_state" not in spec.model_params
+        assert "n_jobs" not in spec.model_params
+        assert "max_iter" not in spec.model_params
+        # Normal params should be preserved
+        assert spec.model_params["alpha"] == 1.0
 
     def test_design_experiment_fallback_on_invalid_json(
         self, mock_gemini_client, sample_data_profile, mock_genai

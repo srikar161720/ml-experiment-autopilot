@@ -23,6 +23,12 @@ from src.orchestration.state import (
 )
 
 
+# Parameters that the Jinja2 templates already handle directly.
+# These must be stripped from Gemini's model_params to prevent
+# duplicate keyword arguments in the generated Python scripts.
+TEMPLATE_MANAGED_PARAMS = {"random_state", "n_jobs", "verbose", "max_iter", "probability"}
+
+
 # System prompt for experiment design
 EXPERIMENT_DESIGNER_SYSTEM_PROMPT = """You are an expert ML researcher designing experiments. Your goal is to systematically improve model performance through hypothesis-driven experimentation.
 
@@ -435,11 +441,18 @@ Respond with valid JSON:
             target_transform=preprocessing_data.get("target_transform"),
         )
 
+        # Filter out params that the Jinja2 templates handle separately
+        raw_params = response.get("model_params", {})
+        filtered_params = {
+            k: v for k, v in raw_params.items()
+            if k not in TEMPLATE_MANAGED_PARAMS
+        }
+
         return ExperimentSpec(
             experiment_name=response["experiment_name"],
             hypothesis=response["hypothesis"],
             model_type=response["model_type"],
-            model_params=response.get("model_params", {}),
+            model_params=filtered_params,
             preprocessing=preprocessing,
             reasoning=response.get("reasoning", ""),
         )
