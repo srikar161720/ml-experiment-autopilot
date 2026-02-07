@@ -208,6 +208,8 @@ class ReportGenerator:
                 f"- Columns with missing values: {missing_cols}"
             )
 
+        best_metric_str = f"{state.best_metric:.6f}" if state.best_metric is not None else "N/A"
+
         prompt = f"""## Report Generation Request
 
 ### Dataset
@@ -230,7 +232,7 @@ class ReportGenerator:
 
 ### Best Result
 - Experiment: {state.best_experiment or "N/A"}
-- {primary_metric}: {state.best_metric:.6f if state.best_metric is not None else "N/A"}
+- {primary_metric}: {best_metric_str}
 - Improvement over baseline: {improvement_str}
 
 ### Constraints
