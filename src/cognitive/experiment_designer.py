@@ -26,7 +26,10 @@ from src.orchestration.state import (
 # Parameters that the Jinja2 templates already handle directly.
 # These must be stripped from Gemini's model_params to prevent
 # duplicate keyword arguments in the generated Python scripts.
-TEMPLATE_MANAGED_PARAMS = {"random_state", "n_jobs", "verbose", "max_iter", "probability"}
+TEMPLATE_MANAGED_PARAMS = {
+    "random_state", "n_jobs", "verbose", "max_iter", "probability",
+    "verbosity", "nthread", "num_threads",
+}
 
 
 # System prompt for experiment design
@@ -41,8 +44,10 @@ PRINCIPLES:
 6. Avoid repeating experiments that have already been tried
 
 AVAILABLE MODELS:
-- Regression: LinearRegression, Ridge, Lasso, ElasticNet, RandomForestRegressor, GradientBoostingRegressor, DecisionTreeRegressor, SVR, KNeighborsRegressor
-- Classification: LogisticRegression, RandomForestClassifier, GradientBoostingClassifier, DecisionTreeClassifier, SVC, KNeighborsClassifier, GaussianNB
+- Regression: LinearRegression, Ridge, Lasso, ElasticNet, RandomForestRegressor, GradientBoostingRegressor, DecisionTreeRegressor, SVR, KNeighborsRegressor, XGBRegressor, LGBMRegressor
+- Classification: LogisticRegression, RandomForestClassifier, GradientBoostingClassifier, DecisionTreeClassifier, SVC, KNeighborsClassifier, GaussianNB, XGBClassifier, LGBMClassifier
+- XGBoost (XGBRegressor/XGBClassifier): High-performance gradient boosting. Common params: n_estimators, max_depth, learning_rate, subsample, colsample_bytree
+- LightGBM (LGBMRegressor/LGBMClassifier): Fast gradient boosting for large datasets. Common params: n_estimators, num_leaves, max_depth, learning_rate, subsample
 
 PREPROCESSING OPTIONS:
 - missing_values: "drop" | "mean" | "median" | "mode" | "constant"
@@ -256,9 +261,13 @@ class ExperimentDesigner:
 
         # Model families/types
         model_keywords = {
-            'tree': ['RandomForest', 'DecisionTree', 'GradientBoosting'],
+            'tree': ['RandomForest', 'DecisionTree', 'GradientBoosting', 'XGB', 'LGBM'],
             'forest': ['RandomForest'],
-            'boosting': ['GradientBoosting'],
+            'boosting': ['GradientBoosting', 'XGB', 'LGBM'],
+            'xgboost': ['XGB'],
+            'lightgbm': ['LGBM'],
+            'lgbm': ['LGBM'],
+            'gradient boosting': ['GradientBoosting', 'XGB', 'LGBM'],
             'linear': ['LinearRegression', 'LogisticRegression', 'Ridge', 'Lasso'],
             'svm': ['SVC', 'SVR'],
             'knn': ['KNeighbors'],
@@ -478,6 +487,8 @@ Respond with valid JSON:
             models = [
                 ("RandomForestRegressor", {"n_estimators": 100, "max_depth": 10}),
                 ("GradientBoostingRegressor", {"n_estimators": 100, "learning_rate": 0.1}),
+                ("XGBRegressor", {"n_estimators": 100, "max_depth": 6, "learning_rate": 0.1}),
+                ("LGBMRegressor", {"n_estimators": 100, "max_depth": 6, "learning_rate": 0.1}),
                 ("Ridge", {"alpha": 1.0}),
                 ("Lasso", {"alpha": 0.1}),
             ]
@@ -485,6 +496,8 @@ Respond with valid JSON:
             models = [
                 ("RandomForestClassifier", {"n_estimators": 100, "max_depth": 10}),
                 ("GradientBoostingClassifier", {"n_estimators": 100, "learning_rate": 0.1}),
+                ("XGBClassifier", {"n_estimators": 100, "max_depth": 6, "learning_rate": 0.1}),
+                ("LGBMClassifier", {"n_estimators": 100, "max_depth": 6, "learning_rate": 0.1}),
                 ("LogisticRegression", {"max_iter": 1000}),
             ]
 

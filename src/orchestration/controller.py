@@ -19,6 +19,7 @@ from src.cognitive.gemini_client import GeminiClient, GeminiError
 from src.cognitive.experiment_designer import ExperimentDesigner
 from src.cognitive.results_analyzer import ResultsAnalyzer
 from src.cognitive.hypothesis_generator import HypothesisGenerator
+from src.cognitive.report_generator import ReportGenerator
 from src.execution.data_profiler import DataProfiler
 from src.execution.code_generator import CodeGenerator
 from src.execution.experiment_runner import ExperimentRunner
@@ -108,6 +109,7 @@ class ExperimentController:
         self.experiment_designer = ExperimentDesigner(self.gemini)
         self.results_analyzer = ResultsAnalyzer(self.gemini)
         self.hypothesis_generator = HypothesisGenerator(self.gemini)
+        self.report_generator = ReportGenerator(self.gemini)
         self.profiler = DataProfiler(data_path, target_column, task_type)
         self.code_generator = CodeGenerator()
         self.runner = ExperimentRunner()
@@ -406,6 +408,17 @@ class ExperimentController:
         # Log final summary to MLflow
         if self.tracker:
             self.tracker.log_final_summary(self.state)
+
+        # Generate report
+        self.state.phase = ExperimentPhase.REPORT_GENERATION
+        try:
+            report_path = self.report_generator.generate(
+                state=self.state,
+                output_dir=self.output_dir,
+            )
+            print_success(f"Report generated: {report_path}")
+        except Exception as e:
+            print_warning(f"Report generation failed: {e}")
 
         # Print summary
         print_summary(self.state.get_summary())

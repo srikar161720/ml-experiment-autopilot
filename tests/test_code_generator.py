@@ -168,6 +168,174 @@ class TestCodeGenerator:
         assert "max_depth=3" in code
 
 
+    def test_generate_xgboost_regressor(self, temp_data_file, temp_output_dir):
+        """Test generating an XGBoost regression experiment."""
+        generator = CodeGenerator()
+
+        spec = ExperimentSpec(
+            experiment_name="test_xgb_regressor",
+            hypothesis="Test XGBoost regression",
+            model_type="XGBRegressor",
+            model_params={
+                "n_estimators": 100,
+                "max_depth": 6,
+                "learning_rate": 0.1,
+            },
+            preprocessing=PreprocessingConfig(),
+            reasoning="Testing XGBoost",
+        )
+
+        script_path = generator.generate(
+            spec=spec,
+            data_path=temp_data_file,
+            target_column="target",
+            task_type="regression",
+            output_dir=temp_output_dir,
+        )
+
+        assert script_path.exists()
+        code = script_path.read_text()
+        assert "xgboost" in code or "xgb" in code
+        assert "XGBRegressor" in code
+        ast.parse(code)
+
+    def test_generate_xgboost_classifier(self, temp_classification_file, temp_output_dir):
+        """Test generating an XGBoost classification experiment."""
+        generator = CodeGenerator()
+
+        spec = ExperimentSpec(
+            experiment_name="test_xgb_classifier",
+            hypothesis="Test XGBoost classification",
+            model_type="XGBClassifier",
+            model_params={"n_estimators": 50, "max_depth": 4},
+            reasoning="Test",
+        )
+
+        script_path = generator.generate(
+            spec=spec,
+            data_path=temp_classification_file,
+            target_column="target",
+            task_type="classification",
+            output_dir=temp_output_dir,
+        )
+
+        assert script_path.exists()
+        code = script_path.read_text()
+        assert "XGBClassifier" in code
+        ast.parse(code)
+
+    def test_generate_lightgbm_regressor(self, temp_data_file, temp_output_dir):
+        """Test generating a LightGBM regression experiment."""
+        generator = CodeGenerator()
+
+        spec = ExperimentSpec(
+            experiment_name="test_lgbm_regressor",
+            hypothesis="Test LightGBM regression",
+            model_type="LGBMRegressor",
+            model_params={
+                "n_estimators": 100,
+                "max_depth": 5,
+                "learning_rate": 0.05,
+            },
+            preprocessing=PreprocessingConfig(),
+            reasoning="Testing LightGBM",
+        )
+
+        script_path = generator.generate(
+            spec=spec,
+            data_path=temp_data_file,
+            target_column="target",
+            task_type="regression",
+            output_dir=temp_output_dir,
+        )
+
+        assert script_path.exists()
+        code = script_path.read_text()
+        assert "lightgbm" in code or "lgb" in code
+        assert "LGBMRegressor" in code
+        ast.parse(code)
+
+    def test_generate_lightgbm_classifier(self, temp_classification_file, temp_output_dir):
+        """Test generating a LightGBM classification experiment."""
+        generator = CodeGenerator()
+
+        spec = ExperimentSpec(
+            experiment_name="test_lgbm_classifier",
+            hypothesis="Test LightGBM classification",
+            model_type="LGBMClassifier",
+            model_params={"n_estimators": 75},
+            reasoning="Test",
+        )
+
+        script_path = generator.generate(
+            spec=spec,
+            data_path=temp_classification_file,
+            target_column="target",
+            task_type="classification",
+            output_dir=temp_output_dir,
+        )
+
+        assert script_path.exists()
+        code = script_path.read_text()
+        assert "LGBMClassifier" in code
+        ast.parse(code)
+
+    def test_template_routing(self):
+        """Test that _get_template_name correctly routes models to templates."""
+        generator = CodeGenerator()
+
+        # XGBoost routing
+        assert generator._get_template_name("regression", "XGBRegressor") == "xgboost_model.py.jinja"
+        assert generator._get_template_name("classification", "XGBClassifier") == "xgboost_model.py.jinja"
+
+        # LightGBM routing
+        assert generator._get_template_name("regression", "LGBMRegressor") == "lightgbm_model.py.jinja"
+        assert generator._get_template_name("classification", "LGBMClassifier") == "lightgbm_model.py.jinja"
+
+        # Sklearn routing (default)
+        assert generator._get_template_name("regression", "RandomForestRegressor") == "sklearn_regressor.py.jinja"
+        assert generator._get_template_name("classification", "LogisticRegression") == "sklearn_classifier.py.jinja"
+
+        # Backward compatibility (no model_type)
+        assert generator._get_template_name("regression") == "sklearn_regressor.py.jinja"
+        assert generator._get_template_name("classification") == "sklearn_classifier.py.jinja"
+
+    def test_format_model_params_xgboost_lightgbm(self):
+        """Test filtering of XGBoost/LightGBM specific params."""
+        generator = CodeGenerator()
+
+        # XGBoost params
+        xgb_params = {
+            "n_estimators": 100,
+            "max_depth": 6,
+            "learning_rate": 0.1,
+            "random_state": 42,
+            "verbosity": 0,
+            "nthread": 4,
+        }
+        result = generator._format_model_params(xgb_params)
+        assert "n_estimators=100" in result
+        assert "max_depth=6" in result
+        assert "learning_rate=0.1" in result
+        assert "random_state" not in result
+        assert "verbosity" not in result
+        assert "nthread" not in result
+
+        # LightGBM params
+        lgbm_params = {
+            "n_estimators": 50,
+            "num_leaves": 31,
+            "random_state": 42,
+            "verbose": -1,
+            "num_threads": 4,
+        }
+        result = generator._format_model_params(lgbm_params)
+        assert "n_estimators=50" in result
+        assert "num_leaves=31" in result
+        assert "random_state" not in result
+        assert "verbose" not in result
+        assert "num_threads" not in result
+
     def test_format_model_params_excludes_template_managed(self):
         """Test that _format_model_params strips random_state, n_jobs, etc."""
         generator = CodeGenerator()

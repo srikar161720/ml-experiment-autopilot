@@ -65,7 +65,7 @@ class CodeGenerator:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # Select template based on task type
-        template_name = self._get_template_name(task_type)
+        template_name = self._get_template_name(task_type, spec.model_type)
         template = self.env.get_template(template_name)
 
         # Prepare template context
@@ -131,12 +131,15 @@ class CodeGenerator:
 
         return self.generate(spec, data_path, target_column, task_type, output_dir)
 
-    def _get_template_name(self, task_type: str) -> str:
-        """Get the appropriate template name for the task type."""
+    def _get_template_name(self, task_type: str, model_type: str = None) -> str:
+        """Get the appropriate template name for the task type and model."""
+        if model_type and model_type.startswith(("XGB", "xgb")):
+            return "xgboost_model.py.jinja"
+        if model_type and model_type.startswith(("LGBM", "lgb")):
+            return "lightgbm_model.py.jinja"
         if task_type == "regression":
             return "sklearn_regressor.py.jinja"
-        else:
-            return "sklearn_classifier.py.jinja"
+        return "sklearn_classifier.py.jinja"
 
     def _build_context(
         self,
@@ -165,7 +168,10 @@ class CodeGenerator:
 
     # Parameters that the Jinja2 templates already handle directly.
     # Excluded here as a defensive layer to prevent duplicate keyword arguments.
-    TEMPLATE_MANAGED_PARAMS = {"random_state", "n_jobs", "verbose", "max_iter", "probability"}
+    TEMPLATE_MANAGED_PARAMS = {
+        "random_state", "n_jobs", "verbose", "max_iter", "probability",
+        "verbosity", "nthread", "num_threads",
+    }
 
     def _format_model_params(self, params: dict) -> str:
         """Format model parameters as a string for template insertion.

@@ -1,0 +1,16 @@
+{% extends "base_experiment.py.jinja" %}
+
+{% block imports %}
+import lightgbm as lgb
+{% endblock %}
+
+{% block model %}
+    {% if task_type == 'regression' %}
+    return lgb.LGBMRegressor({{ model_params_str }}random_state=RANDOM_STATE, n_jobs=-1, verbose=-1)
+    {% elif task_type == 'classification' %}
+    return lgb.LGBMClassifier({{ model_params_str }}random_state=RANDOM_STATE, n_jobs=-1, verbose=-1)
+    {% else %}
+    # Default to LGBMRegressor
+    return lgb.LGBMRegressor(n_estimators=100, random_state=RANDOM_STATE, n_jobs=-1, verbose=-1)
+    {% endif %}
+{% endblock %}
