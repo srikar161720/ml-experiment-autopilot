@@ -158,6 +158,15 @@ def main():
         y = np.log1p(y)
         {% endif %}
 
+        # Validate data is not empty after preprocessing
+        if len(X) == 0 or len(y) == 0:
+            result = {
+                "success": False,
+                "error": "No data remaining after preprocessing. Check for excessive missing values."
+            }
+            print(json.dumps(result))
+            sys.exit(1)
+
         # Split data
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE

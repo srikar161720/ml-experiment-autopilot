@@ -18,6 +18,7 @@ class MLflowTracker:
     - Automatic experiment creation
     - Metric and parameter logging
     - Artifact storage
+    - Graceful degradation if MLflow fails
     """
 
     def __init__(
@@ -33,20 +34,28 @@ class MLflowTracker:
         """
         self.experiment_name = experiment_name
         self.tracking_uri = tracking_uri or str(MLRUNS_DIR)
+        self.disabled = False
 
-        # Set up MLflow
-        mlflow.set_tracking_uri(self.tracking_uri)
+        try:
+            # Set up MLflow
+            mlflow.set_tracking_uri(self.tracking_uri)
 
-        # Create or get experiment
-        experiment = mlflow.get_experiment_by_name(experiment_name)
-        if experiment is None:
-            self.experiment_id = mlflow.create_experiment(experiment_name)
-        else:
-            self.experiment_id = experiment.experiment_id
+            # Create or get experiment
+            experiment = mlflow.get_experiment_by_name(experiment_name)
+            if experiment is None:
+                self.experiment_id = mlflow.create_experiment(experiment_name)
+            else:
+                self.experiment_id = experiment.experiment_id
 
-        mlflow.set_experiment(experiment_name)
+            mlflow.set_experiment(experiment_name)
 
-        self.client = MlflowClient(self.tracking_uri)
+            self.client = MlflowClient(self.tracking_uri)
+        except Exception as e:
+            self.disabled = True
+            self.experiment_id = None
+            self.client = None
+            from src.utils.display import print_warning
+            print_warning(f"MLflow initialization failed, tracking disabled: {e}")
 
     def log_data_profile(self, profile: DataProfile):
         """Log the data profile as experiment metadata.
@@ -54,26 +63,32 @@ class MLflowTracker:
         Args:
             profile: DataProfile from the data profiler.
         """
-        with mlflow.start_run(run_name="data_profile"):
-            # Log dataset info as parameters
-            mlflow.log_params({
-                "n_rows": profile.n_rows,
-                "n_columns": profile.n_columns,
-                "n_numeric_features": len(profile.numeric_columns),
-                "n_categorical_features": len(profile.categorical_columns),
-                "target_column": profile.target_column,
-                "target_type": profile.target_type,
-            })
+        if self.disabled:
+            return
+        try:
+            with mlflow.start_run(run_name="data_profile"):
+                # Log dataset info as parameters
+                mlflow.log_params({
+                    "n_rows": profile.n_rows,
+                    "n_columns": profile.n_columns,
+                    "n_numeric_features": len(profile.numeric_columns),
+                    "n_categorical_features": len(profile.categorical_columns),
+                    "target_column": profile.target_column,
+                    "target_type": profile.target_type,
+                })
 
-            # Log missing value summary
-            total_missing = sum(profile.missing_values.values())
-            mlflow.log_metric("total_missing_values", total_missing)
+                # Log missing value summary
+                total_missing = sum(profile.missing_values.values())
+                mlflow.log_metric("total_missing_values", total_missing)
 
-            # Log profile as artifact
-            profile_path = Path("data_profile.json")
-            profile_path.write_text(profile.model_dump_json(indent=2))
-            mlflow.log_artifact(str(profile_path))
-            profile_path.unlink()
+                # Log profile as artifact
+                profile_path = Path("data_profile.json")
+                profile_path.write_text(profile.model_dump_json(indent=2))
+                mlflow.log_artifact(str(profile_path))
+                profile_path.unlink()
+        except Exception as e:
+            from src.utils.display import print_warning
+            print_warning(f"MLflow log_data_profile failed: {e}")
 
     def log_experiment(self, result: ExperimentResult):
         """Log a single experiment run.
@@ -81,51 +96,57 @@ class MLflowTracker:
         Args:
             result: ExperimentResult from the experiment runner.
         """
-        with mlflow.start_run(run_name=result.experiment_name):
-            # Log parameters
-            params = {
-                "model_type": result.model_type,
-                "iteration": result.iteration,
-                **{f"model_{k}": v for k, v in result.model_params.items()},
-                "preprocessing_missing": result.preprocessing.missing_values,
-                "preprocessing_scaling": result.preprocessing.scaling,
-                "preprocessing_encoding": result.preprocessing.encoding,
-            }
-            mlflow.log_params(params)
+        if self.disabled:
+            return
+        try:
+            with mlflow.start_run(run_name=result.experiment_name):
+                # Log parameters
+                params = {
+                    "model_type": result.model_type,
+                    "iteration": result.iteration,
+                    **{f"model_{k}": v for k, v in result.model_params.items()},
+                    "preprocessing_missing": result.preprocessing.missing_values,
+                    "preprocessing_scaling": result.preprocessing.scaling,
+                    "preprocessing_encoding": result.preprocessing.encoding,
+                }
+                mlflow.log_params(params)
 
-            # Log metrics
-            if result.success and result.metrics:
-                mlflow.log_metrics(result.metrics)
+                # Log metrics
+                if result.success and result.metrics:
+                    mlflow.log_metrics(result.metrics)
 
-            # Log execution info
-            mlflow.log_metric("execution_time", result.execution_time)
-            mlflow.log_metric("success", 1 if result.success else 0)
+                # Log execution info
+                mlflow.log_metric("execution_time", result.execution_time)
+                mlflow.log_metric("success", 1 if result.success else 0)
 
-            # Log tags
-            mlflow.set_tags({
-                "hypothesis": result.hypothesis[:250] if result.hypothesis else "",
-                "success": str(result.success),
-            })
+                # Log tags
+                mlflow.set_tags({
+                    "hypothesis": result.hypothesis[:250] if result.hypothesis else "",
+                    "success": str(result.success),
+                })
 
-            # Log reasoning as artifact
-            if result.reasoning:
-                reasoning_path = Path("reasoning.txt")
-                reasoning_path.write_text(result.reasoning)
-                mlflow.log_artifact(str(reasoning_path))
-                reasoning_path.unlink()
+                # Log reasoning as artifact
+                if result.reasoning:
+                    reasoning_path = Path("reasoning.txt")
+                    reasoning_path.write_text(result.reasoning)
+                    mlflow.log_artifact(str(reasoning_path))
+                    reasoning_path.unlink()
 
-            # Log code as artifact if available
-            if result.code_path:
-                code_path = Path(result.code_path)
-                if code_path.exists():
-                    mlflow.log_artifact(str(code_path))
+                # Log code as artifact if available
+                if result.code_path:
+                    code_path = Path(result.code_path)
+                    if code_path.exists():
+                        mlflow.log_artifact(str(code_path))
 
-            # Log error if failed
-            if not result.success and result.error_message:
-                error_path = Path("error.txt")
-                error_path.write_text(result.error_message)
-                mlflow.log_artifact(str(error_path))
-                error_path.unlink()
+                # Log error if failed
+                if not result.success and result.error_message:
+                    error_path = Path("error.txt")
+                    error_path.write_text(result.error_message)
+                    mlflow.log_artifact(str(error_path))
+                    error_path.unlink()
+        except Exception as e:
+            from src.utils.display import print_warning
+            print_warning(f"MLflow log_experiment failed: {e}")
 
     def log_final_summary(self, state: ExperimentState):
         """Log final experiment summary.
@@ -133,29 +154,52 @@ class MLflowTracker:
         Args:
             state: Final ExperimentState after all iterations.
         """
-        with mlflow.start_run(run_name="final_summary"):
-            # Log summary metrics
-            mlflow.log_metrics({
-                "total_iterations": state.current_iteration,
-                "successful_experiments": sum(1 for e in state.experiments if e.success),
-                "total_time_seconds": state.get_elapsed_time(),
-            })
+        if self.disabled:
+            return
+        try:
+            with mlflow.start_run(run_name="final_summary"):
+                # Log summary metrics
+                mlflow.log_metrics({
+                    "total_iterations": state.current_iteration,
+                    "successful_experiments": sum(1 for e in state.experiments if e.success),
+                    "total_time_seconds": state.get_elapsed_time(),
+                })
 
-            if state.best_metric is not None:
-                mlflow.log_metric("best_metric", state.best_metric)
+                if state.best_metric is not None:
+                    mlflow.log_metric("best_metric", state.best_metric)
 
-            # Log tags
-            mlflow.set_tags({
-                "best_experiment": state.best_experiment or "none",
-                "termination_reason": state.termination_reason or "completed",
-                "phase": state.phase.value,
-            })
+                # Log tags
+                mlflow.set_tags({
+                    "best_experiment": state.best_experiment or "none",
+                    "termination_reason": state.termination_reason or "completed",
+                    "phase": state.phase.value,
+                })
 
-            # Log state as artifact
-            state_path = Path("final_state.json")
-            state.save(state_path)
-            mlflow.log_artifact(str(state_path))
-            state_path.unlink()
+                # Log state as artifact
+                state_path = Path("final_state.json")
+                state.save(state_path)
+                mlflow.log_artifact(str(state_path))
+                state_path.unlink()
+        except Exception as e:
+            from src.utils.display import print_warning
+            print_warning(f"MLflow log_final_summary failed: {e}")
+
+    def log_visualizations(self, plot_paths: list[Path]):
+        """Log visualization plots as MLflow artifacts.
+
+        Args:
+            plot_paths: List of paths to generated plot files.
+        """
+        if self.disabled:
+            return
+        try:
+            with mlflow.start_run(run_name="visualizations"):
+                for plot_path in plot_paths:
+                    if plot_path.exists():
+                        mlflow.log_artifact(str(plot_path))
+        except Exception as e:
+            from src.utils.display import print_warning
+            print_warning(f"MLflow log_visualizations failed: {e}")
 
     def get_best_run(self, metric_name: str, ascending: bool = True) -> Optional[dict]:
         """Get the best run based on a metric.
@@ -167,6 +211,9 @@ class MLflowTracker:
         Returns:
             Dictionary with run info, or None if no runs found.
         """
+        if self.disabled:
+            return None
+
         order = "ASC" if ascending else "DESC"
         runs = self.client.search_runs(
             experiment_ids=[self.experiment_id],
@@ -192,6 +239,9 @@ class MLflowTracker:
         Returns:
             List of run dictionaries.
         """
+        if self.disabled:
+            return []
+
         runs = self.client.search_runs(
             experiment_ids=[self.experiment_id],
             order_by=["start_time DESC"],

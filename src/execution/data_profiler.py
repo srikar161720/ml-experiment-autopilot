@@ -40,16 +40,28 @@ class DataProfiler:
             Loaded pandas DataFrame.
 
         Raises:
-            ValueError: If file format is not supported.
+            FileNotFoundError: If the dataset file does not exist.
+            ValueError: If file format is not supported or file cannot be parsed.
         """
         suffix = self.data_path.suffix.lower()
 
-        if suffix == ".csv":
-            self.df = pd.read_csv(self.data_path)
-        elif suffix == ".parquet":
-            self.df = pd.read_parquet(self.data_path)
-        else:
-            raise ValueError(f"Unsupported file format: {suffix}. Use CSV or Parquet.")
+        try:
+            if suffix == ".csv":
+                self.df = pd.read_csv(self.data_path)
+            elif suffix == ".parquet":
+                self.df = pd.read_parquet(self.data_path)
+            else:
+                raise ValueError(f"Unsupported file format: {suffix}. Use CSV or Parquet.")
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                f"Dataset file not found: {self.data_path}. "
+                f"Please check the path and try again."
+            )
+        except pd.errors.ParserError as e:
+            raise ValueError(
+                f"Failed to parse dataset file {self.data_path}: {e}. "
+                f"Ensure the file is a valid CSV."
+            )
 
         return self.df
 
@@ -64,6 +76,19 @@ class DataProfiler:
         """
         if self.df is None:
             self.load_data()
+
+        if len(self.df) < 2:
+            raise ValueError(
+                f"Dataset has only {len(self.df)} row(s), which is insufficient "
+                f"for train/test splitting. Please provide a dataset with at least 10 rows."
+            )
+
+        if len(self.df) < 10:
+            from src.utils.display import print_warning
+            print_warning(
+                f"Dataset has only {len(self.df)} rows. "
+                f"Results may be unreliable with fewer than 10 rows."
+            )
 
         if self.target_column not in self.df.columns:
             raise ValueError(

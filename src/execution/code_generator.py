@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional
 
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
 from src.config import TEMPLATES_DIR, EXPERIMENTS_DIR
 from src.orchestration.state import ExperimentSpec, PreprocessingConfig
@@ -66,7 +66,13 @@ class CodeGenerator:
 
         # Select template based on task type
         template_name = self._get_template_name(task_type, spec.model_type)
-        template = self.env.get_template(template_name)
+        try:
+            template = self.env.get_template(template_name)
+        except TemplateNotFound:
+            raise CodeGenerationError(
+                f"Template '{template_name}' not found. "
+                f"Check that the templates directory contains this file."
+            )
 
         # Prepare template context
         context = self._build_context(spec, data_path, target_column, task_type)
@@ -79,7 +85,12 @@ class CodeGenerator:
 
         # Save to file
         script_path = output_dir / f"{spec.experiment_name}.py"
-        script_path.write_text(code)
+        try:
+            script_path.write_text(code)
+        except OSError as e:
+            raise CodeGenerationError(
+                f"Failed to write generated script to {script_path}: {e}"
+            )
 
         return script_path
 

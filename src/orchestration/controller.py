@@ -23,6 +23,7 @@ from src.cognitive.report_generator import ReportGenerator
 from src.execution.data_profiler import DataProfiler
 from src.execution.code_generator import CodeGenerator
 from src.execution.experiment_runner import ExperimentRunner
+from src.execution.visualization_generator import VisualizationGenerator
 from src.persistence.mlflow_tracker import create_tracker
 from src.utils.display import (
     console,
@@ -113,6 +114,7 @@ class ExperimentController:
         self.profiler = DataProfiler(data_path, target_column, task_type)
         self.code_generator = CodeGenerator()
         self.runner = ExperimentRunner()
+        self.visualization_generator = VisualizationGenerator()
 
         # MLflow tracker (initialized after profiling)
         self.tracker = None
@@ -409,12 +411,32 @@ class ExperimentController:
         if self.tracker:
             self.tracker.log_final_summary(self.state)
 
+        # Generate visualizations (before report so paths can be included)
+        plot_paths = []
+        try:
+            plot_paths = self.visualization_generator.generate(
+                state=self.state,
+                output_dir=self.output_dir,
+            )
+            if plot_paths:
+                print_success(f"Generated {len(plot_paths)} visualization(s)")
+        except Exception as e:
+            print_warning(f"Visualization generation failed: {e}")
+
+        # Log visualizations to MLflow
+        if self.tracker and plot_paths:
+            try:
+                self.tracker.log_visualizations(plot_paths)
+            except Exception as e:
+                print_warning(f"Failed to log visualizations to MLflow: {e}")
+
         # Generate report
         self.state.phase = ExperimentPhase.REPORT_GENERATION
         try:
             report_path = self.report_generator.generate(
                 state=self.state,
                 output_dir=self.output_dir,
+                plot_paths=plot_paths,
             )
             print_success(f"Report generated: {report_path}")
         except Exception as e:
@@ -431,5 +453,8 @@ class ExperimentController:
 
     def save_state(self):
         """Save current state to file."""
-        state_path = self.output_dir / f"state_{self.state.session_id}.json"
-        self.state.save(state_path)
+        try:
+            state_path = self.output_dir / f"state_{self.state.session_id}.json"
+            self.state.save(state_path)
+        except Exception as e:
+            print_warning(f"Failed to save state: {e}")

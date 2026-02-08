@@ -83,12 +83,18 @@ class ReportGenerator:
         """
         self.client = gemini_client
 
-    def generate(self, state: ExperimentState, output_dir: Path) -> Path:
+    def generate(
+        self,
+        state: ExperimentState,
+        output_dir: Path,
+        plot_paths: Optional[list[Path]] = None,
+    ) -> Path:
         """Generate the final experiment report.
 
         Args:
             state: Complete ExperimentState after all iterations.
             output_dir: Base output directory (reports saved to output_dir/reports/).
+            plot_paths: Optional list of paths to generated visualization PNGs.
 
         Returns:
             Path to the generated Markdown report file.
@@ -98,6 +104,7 @@ class ReportGenerator:
         dataset_section = self._build_dataset_section(state)
         results_table = self._build_results_table(state)
         best_model_section = self._build_best_model_section(state)
+        visualizations_section = self._build_visualizations_section(plot_paths)
         appendix_section = self._build_appendix_section(state)
         run_metadata = self._build_run_metadata(state)
 
@@ -116,6 +123,7 @@ class ReportGenerator:
             results_table=results_table,
             best_model_section=best_model_section,
             key_insights=narrative["key_insights"],
+            visualizations_section=visualizations_section,
             recommendations=narrative["recommendations"],
             appendix_section=appendix_section,
             run_metadata=run_metadata,
@@ -563,6 +571,29 @@ Output format:
 
         return "\n\n---\n\n".join(blocks)
 
+    def _build_visualizations_section(
+        self, plot_paths: Optional[list[Path]]
+    ) -> str:
+        """Build the Visualizations section with image references.
+
+        Args:
+            plot_paths: List of paths to generated plot PNG files.
+
+        Returns:
+            Markdown section with image references, or empty string if no plots.
+        """
+        if not plot_paths:
+            return ""
+
+        lines = ["## Visualizations", ""]
+        for path in plot_paths:
+            name = path.stem.replace("_", " ").title()
+            lines.append(f"### {name}")
+            lines.append(f"![{name}](../plots/{path.name})")
+            lines.append("")
+
+        return "\n".join(lines)
+
     def _build_run_metadata(self, state: ExperimentState) -> str:
         """Build run metadata footer.
 
@@ -595,6 +626,7 @@ Output format:
         results_table: str,
         best_model_section: str,
         key_insights: str,
+        visualizations_section: str,
         recommendations: str,
         appendix_section: str,
         run_metadata: str,
@@ -604,6 +636,9 @@ Output format:
         Returns:
             Complete Markdown report as a string.
         """
+        # Build visualizations block (only if non-empty)
+        viz_block = f"\n{visualizations_section}\n" if visualizations_section else ""
+
         return f"""# ML Experiment Report: {dataset_name}
 
 ## Executive Summary
@@ -631,7 +666,7 @@ Output format:
 ## Key Insights
 
 {key_insights}
-
+{viz_block}
 ## Recommendations
 
 {recommendations}

@@ -17,6 +17,7 @@ TEMPLATES_DIR = PROJECT_ROOT / "templates"
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 EXPERIMENTS_DIR = OUTPUTS_DIR / "experiments"
 REPORTS_DIR = OUTPUTS_DIR / "reports"
+PLOTS_DIR = OUTPUTS_DIR / "plots"
 MODELS_DIR = OUTPUTS_DIR / "models"
 MLRUNS_DIR = OUTPUTS_DIR / "mlruns"
 DATA_DIR = PROJECT_ROOT / "data"
@@ -87,6 +88,7 @@ def ensure_directories():
         OUTPUTS_DIR,
         EXPERIMENTS_DIR,
         REPORTS_DIR,
+        PLOTS_DIR,
         MODELS_DIR,
         MLRUNS_DIR,
         DATA_DIR,

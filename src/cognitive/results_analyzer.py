@@ -180,21 +180,21 @@ class ResultsAnalyzer:
         lower_is_better = self._is_lower_better(primary_metric)
 
         change_from_baseline = None
-        if baseline_value is not None and baseline_value != 0:
+        if baseline_value is not None and abs(baseline_value) > 1e-12:
             if lower_is_better:
                 change_from_baseline = ((baseline_value - current_value) / abs(baseline_value)) * 100
             else:
                 change_from_baseline = ((current_value - baseline_value) / abs(baseline_value)) * 100
 
         change_from_best = None
-        if best_value is not None and best_value != 0:
+        if best_value is not None and abs(best_value) > 1e-12:
             if lower_is_better:
                 change_from_best = ((best_value - current_value) / abs(best_value)) * 100
             else:
                 change_from_best = ((current_value - best_value) / abs(best_value)) * 100
 
         change_from_previous = None
-        if previous_value is not None and previous_value != 0:
+        if previous_value is not None and abs(previous_value) > 1e-12:
             if lower_is_better:
                 change_from_previous = ((previous_value - current_value) / abs(previous_value)) * 100
             else:
@@ -266,7 +266,7 @@ class ResultsAnalyzer:
         for i in range(1, len(recent_metrics)):
             prev = recent_metrics[i - 1]
             curr = recent_metrics[i]
-            if prev != 0:
+            if abs(prev) > 1e-12:
                 if lower_is_better:
                     change = (prev - curr) / abs(prev)
                 else:
