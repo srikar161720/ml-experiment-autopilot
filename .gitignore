@@ -28,6 +28,8 @@ htmlcov/
 # Project outputs (keep .gitkeep files)
 outputs/experiments/*
 !outputs/experiments/.gitkeep
+outputs/plots/*
+!outputs/plots/.gitkeep
 outputs/reports/*
 !outputs/reports/.gitkeep
 outputs/models/*
