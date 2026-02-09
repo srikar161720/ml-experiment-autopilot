@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, OneHotEncoder, OrdinalEncoder
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, OneHotEncoder, OrdinalEncoder, LabelEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
@@ -156,6 +156,14 @@ def main():
         {% if preprocessing.target_transform == 'log' and task_type == 'regression' %}
         # Log transform target
         y = np.log1p(y)
+        {% endif %}
+
+        {% if task_type == 'classification' %}
+        # Encode string target labels to integers (required by XGBoost/LightGBM,
+        # harmless for sklearn models which do this internally anyway)
+        if y.dtype == object:
+            _label_encoder = LabelEncoder()
+            y = pd.Series(_label_encoder.fit_transform(y), index=y.index)
         {% endif %}
 
         # Validate data is not empty after preprocessing
