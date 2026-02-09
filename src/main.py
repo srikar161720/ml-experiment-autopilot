@@ -5,15 +5,47 @@ from typing import Optional
 from enum import Enum
 
 import typer
+from typer.core import TyperGroup
 from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 from src import __version__
 from src.config import get_config, ensure_directories
+
+
+class AutopilotGroup(TyperGroup):
+    """Custom TyperGroup that appends a 'Run Arguments' panel to --help."""
+
+    def format_help(self, ctx, formatter):
+        super().format_help(ctx, formatter)
+
+        console = Console()
+
+        table = Table(show_header=False, box=None, padding=(0, 2), pad_edge=False, expand=True)
+        table.add_column("flag", style="green", no_wrap=True)
+        table.add_column("status", style="dim", no_wrap=True)
+        table.add_column("desc")
+
+        table.add_row("--data, -d", "(required)", "Path to dataset (CSV or Parquet file)")
+        table.add_row("--target, -t", "(required)", "Target column name for prediction")
+        table.add_row("--task", "(required)", "ML task: classification or regression")
+        table.add_row("--constraints, -c", "(optional)", "Path to constraints file (Markdown)")
+        table.add_row("--max-iterations, -n", "(optional)", "Max experiment iterations [default: 20]")
+        table.add_row("--time-budget", "(optional)", "Time budget in seconds [default: 3600]")
+        table.add_row("--output-dir, -o", "(optional)", "Output directory for results")
+        table.add_row("--verbose, -v", "(optional)", "Show detailed Gemini reasoning")
+        table.add_row("--resume", "(optional)", "Resume from a saved state file")
+
+        panel = Panel(table, title="Run Arguments", title_align="left", border_style="dim")
+        console.print(panel)
+
 
 app = typer.Typer(
     name="autopilot",
     help="ML Experiment Autopilot - Autonomous ML experimentation powered by Gemini",
     add_completion=False,
+    cls=AutopilotGroup,
 )
 
 console = Console()
