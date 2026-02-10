@@ -25,6 +25,10 @@ ENV/
 .coverage
 htmlcov/
 
+# Project docs (keep .gitkeep files)
+docs/*
+!docs/.gitkeep
+
 # Project outputs (keep .gitkeep files)
 outputs/experiments/*
 !outputs/experiments/.gitkeep
